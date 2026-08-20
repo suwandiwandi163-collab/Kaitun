@@ -1,5 +1,5 @@
 -- ============================================================
--- JinHub NEW GUI v1.4
+-- JinHub NEW GUI v1.5
 -- ============================================================
 
 local CoreGui = game:GetService("CoreGui")
@@ -754,7 +754,11 @@ ActiveQuestLabel.Parent = MainFrame
 -- State.activeQuest bisa diisi manual atau dihubungkan ke data quest asli nanti
 State.activeQuest = State.activeQuest or "-"
 
-local function updateActiveQuestLabel()
+local function updateActiveQuestLabel(questText)
+    -- Kalau dipanggil dari kaitun script dengan parameter, update State dulu
+    if questText then
+        State.activeQuest = questText
+    end
     ActiveQuestLabel.Text = string.format(
         '<font color="#FEF08A">Active Quest:</font>   <font color="#FFFFFF"><b>%s</b></font>',
         tostring(State.activeQuest)
