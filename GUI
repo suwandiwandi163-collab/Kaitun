@@ -1,5 +1,5 @@
 -- ============================================================
--- JinHub NEW GUI v1.7
+-- JinHub NEW GUI v1.8
 -- ============================================================
 
 local CoreGui = game:GetService("CoreGui")
@@ -1197,9 +1197,9 @@ task.spawn(function()
     end
 end)
 
--- Win banner preview (animasi dot matrix) - show "JinHub" for 3 seconds
-State.showWinBanner = true
-State.winBannerEndTime = os.clock() + 3
+-- Win banner DISABLED - langsung show CPM traffic visualization
+State.showWinBanner = false
+State.winBannerEndTime = 0
 
 -- Return GUI object untuk integrasi dengan kaitun script
 return {
