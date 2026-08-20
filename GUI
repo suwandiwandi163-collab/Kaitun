@@ -1,6 +1,5 @@
-
 -- ============================================================
--- JinHub NEW GUI
+-- JinHub NEW GUI v1.2
 -- ============================================================
 
 local CoreGui = game:GetService("CoreGui")
@@ -273,13 +272,17 @@ local function getCurrentCash()
     return maxCash
 end
 
--- Dummy state cuma buat animasi visual & label, gak nyambung ke game
+-- State yang bisa diakses dari luar (untuk integrasi dengan kaitun script)
 local State = {
     farming = false,
     disable3D = false,
     progress = 0,
     showWinBanner = false,
     winBannerEndTime = 0,
+    target = {},
+    activeQuest = "-",
+    cpm = "-",
+    fridge = "-",
 }
 
 local function formatNumber(n)
@@ -971,6 +974,7 @@ FarmBtnStroke.Color = Color3.fromRGB(250, 204, 21)
 FarmBtnStroke.Transparency = 0.4
 FarmBtnStroke.Parent = FarmBtn
 
+-- Button click handler akan di-override oleh kaitun script
 FarmBtn.MouseButton1Click:Connect(function()
     State.farming = not State.farming
     FarmBtn.Text = State.farming and "STOP AUTO FARM" or "START AUTO FARM"
@@ -982,6 +986,8 @@ local Disable3DBtn, Disable3DStroke = createSubButton(
     ControlsFrame, UDim2.new(0, 340, 0, 44), UDim2.new(0, 344, 0, 0),
     "Disable 3D: OFF"
 )
+
+-- Button click handler akan di-override oleh kaitun script
 Disable3DBtn.MouseButton1Click:Connect(function()
     State.disable3D = not State.disable3D
     Disable3DBtn.Text = "Disable 3D: " .. (State.disable3D and "ON" or "OFF")
@@ -1120,3 +1126,18 @@ end)
 -- Win banner preview (animasi dot matrix)
 State.showWinBanner = true
 State.winBannerEndTime = os.clock() + 4
+
+-- Return GUI object untuk integrasi dengan kaitun script
+return {
+    State = State,
+    ScreenGui = ScreenGui,
+    MainFrame = MainFrame,
+    SubheaderLabel = SubheaderLabel,
+    FarmBtn = FarmBtn,
+    Disable3DBtn = Disable3DBtn,
+    setLowRenderMode = setLowRenderMode,
+    updateActiveQuestLabel = updateActiveQuestLabel,
+    updateTargetLabel = updateTargetLabel,
+    updateMetricPrimaryLabel = updateMetricPrimaryLabel,
+    updateMetricSecondaryLabel = updateMetricSecondaryLabel,
+}
