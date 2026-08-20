@@ -1,5 +1,5 @@
 -- ============================================================
--- JinHub NEW GUI v1.5
+-- JinHub NEW GUI v1.6
 -- ============================================================
 
 local CoreGui = game:GetService("CoreGui")
@@ -518,6 +518,37 @@ task.spawn(function()
             State.showWinBanner = false
         end
 
+        -- CPM-based traffic visualization
+        -- Parse CPM dari State.cpm (format: "$1.2k/min" atau "-")
+        local cpmValue = 0
+        if State.cpm and State.cpm ~= "-" then
+            local numStr = State.cpm:match("[%d%.]+")
+            if numStr then
+                cpmValue = tonumber(numStr) or 0
+                -- Handle "k" multiplier (e.g., "1.2k" = 1200)
+                if State.cpm:find("k") or State.cpm:find("K") then
+                    cpmValue = cpmValue * 1000
+                end
+            end
+        end
+        
+        -- Normalize CPM to 0-1 range with logarithmic scaling
+        -- This makes low CPM ($10-100) visible while still showing difference at high CPM
+        -- Range: $10 = ~0.3, $100 = ~0.5, $500 = ~0.7, $2000+ = 0.9-1.0
+        local maxCPM = 2000
+        local minVisibleCPM = 10
+        
+        local cpmIntensity = 0
+        if cpmValue >= minVisibleCPM then
+            -- Logarithmic scaling for better low-value visibility
+            local logValue = math.log(cpmValue) / math.log(maxCPM)
+            cpmIntensity = math.clamp(logValue, 0, 1)
+        end
+        
+        -- Traffic wave height based on CPM (0-1)
+        -- Even at CPM $10, we want visible traffic (min 0.35)
+        local trafficHeight = cpmIntensity * 0.6 + 0.35 -- Min 0.35, max 0.95
+        
         local pct = math.clamp(State.progress, 0, 1)
         local filledCount = math.floor(pct * #dots)
 
@@ -545,18 +576,43 @@ task.spawn(function()
                     strokeTrans = 1
                 end
             else
-                -- Dot fill sekarang ngikutin State.progress asli (fill % fridge),
-                -- gak lagi digantung ke State.farming (yang cuma toggle UI dummy).
+                -- CPM-based traffic visualization
+                -- Create vertical wave pattern that responds to CPM
+                local colOffset = (c / COLS) * math.pi * 2 -- Column position in wave
+                local timeOffset = t * 2.5 -- Wave speed
+                
+                -- Main traffic wave (moves from left to right)
+                local waveValue = math.sin(colOffset + timeOffset) * 0.5 + 0.5
+                
+                -- Calculate threshold for this row (bottom rows activate first)
+                local rowThreshold = 1 - (r / ROWS)
+                
+                -- Determine if this dot should be "active" based on CPM traffic
+                local isActiveInWave = (waveValue * trafficHeight) > rowThreshold
+                
                 if idx <= filledCount then
+                    -- Fridge progress fill (yellow)
                     targetCol = Color3.fromRGB(250, 204, 21)
                     targetTrans = 0.1
                     strokeTrans = 0.3
                     stroke.Color = Color3.fromRGB(250, 204, 21)
+                elseif isActiveInWave then
+                    -- Active traffic dot (green spectrum based on CPM intensity)
+                    local greenIntensity = math.clamp(cpmIntensity, 0.3, 1)
+                    targetCol = Color3.new(
+                        0.2 + (1 - greenIntensity) * 0.6, -- Red channel
+                        0.8 * greenIntensity, -- Green channel
+                        0.2 -- Blue channel
+                    )
+                    targetTrans = 0.15 + (1 - waveValue) * 0.3
+                    strokeTrans = 0.4
+                    stroke.Color = Color3.fromRGB(74, 222, 128)
                 else
+                    -- Inactive background dots
                     local speed = State.farming and 4.5 or 3.0
                     local wave = math.sin(t * speed + c * 0.3 + r * 0.2) * 0.5 + 0.5
                     targetCol = Color3.fromRGB(255, 255, 255)
-                    targetTrans = math.clamp(1 - wave * 0.6, 0.45, 0.92)
+                    targetTrans = math.clamp(1 - wave * 0.4, 0.55, 0.92)
                     strokeTrans = 1
                 end
             end
