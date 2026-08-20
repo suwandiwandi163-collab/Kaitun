@@ -1,5 +1,5 @@
 -- ============================================================
--- JinHub NEW GUI v1.6
+-- JinHub NEW GUI v1.7
 -- ============================================================
 
 local CoreGui = game:GetService("CoreGui")
@@ -511,11 +511,21 @@ for r = 1, ROWS do
 end
 
 task.spawn(function()
+    local bannerStartTime = os.clock()
+    
     while true do
         local t = os.clock()
         local isWinActive = State.showWinBanner and (t < State.winBannerEndTime)
+        
+        -- Auto-clear banner after timeout
         if State.showWinBanner and (t >= State.winBannerEndTime) then
             State.showWinBanner = false
+        end
+        
+        -- Safety: force-clear banner if stuck for more than 5 seconds
+        if State.showWinBanner and (t - bannerStartTime) > 5 then
+            State.showWinBanner = false
+            State.winBannerEndTime = 0
         end
 
         -- CPM-based traffic visualization
@@ -1187,9 +1197,9 @@ task.spawn(function()
     end
 end)
 
--- Win banner preview (animasi dot matrix)
+-- Win banner preview (animasi dot matrix) - show "JinHub" for 3 seconds
 State.showWinBanner = true
-State.winBannerEndTime = os.clock() + 4
+State.winBannerEndTime = os.clock() + 3
 
 -- Return GUI object untuk integrasi dengan kaitun script
 return {
