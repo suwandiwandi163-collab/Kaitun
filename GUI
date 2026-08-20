@@ -1,5 +1,5 @@
 -- ============================================================
--- JinHub NEW GUI v1.2
+-- JinHub NEW GUI v1.3
 -- ============================================================
 
 local CoreGui = game:GetService("CoreGui")
@@ -273,8 +273,9 @@ local function getCurrentCash()
 end
 
 -- State yang bisa diakses dari luar (untuk integrasi dengan kaitun script)
+-- Default: farming = true karena auto-start
 local State = {
-    farming = false,
+    farming = true, -- Auto-start enabled
     disable3D = false,
     progress = 0,
     showWinBanner = false,
@@ -434,7 +435,7 @@ local SubheaderLabel = Instance.new("TextLabel")
 SubheaderLabel.Size = UDim2.new(1, -56, 0, 20)
 SubheaderLabel.Position = UDim2.new(0, 28, 0, 52)
 SubheaderLabel.BackgroundTransparency = 1
-SubheaderLabel.Text = "Kaitun 0.0.1  |  discord.gg/XPdhVZTaNv  |  Status: IDLE"
+SubheaderLabel.Text = "Kaitun 0.0.1  |  discord.gg/XPdhVZTaNv  |  Status: STARTING..." -- Default starting
 SubheaderLabel.TextColor3 = Color3.fromRGB(254, 240, 138)
 SubheaderLabel.TextSize = 13
 SubheaderLabel.Font = Enum.Font.GothamMedium
@@ -951,13 +952,13 @@ local function createSubButton(parent, size, pos, textStr)
     return btn, bStroke
 end
 
--- Tombol Farm (cuma toggle teks/warna, gak jalanin apa-apa)
+-- Tombol Farm - default STOP karena auto-start
 local FarmBtn = Instance.new("TextButton")
 FarmBtn.Name = "FarmBtn"
 FarmBtn.Size = UDim2.new(0, 330, 0, 44)
 FarmBtn.Position = UDim2.new(0, 0, 0, 0)
-FarmBtn.BackgroundColor3 = Color3.fromRGB(234, 179, 8)
-FarmBtn.Text = "START AUTO FARM"
+FarmBtn.BackgroundColor3 = Color3.fromRGB(225, 29, 72) -- Red for STOP
+FarmBtn.Text = "STOP AUTO FARM" -- Default STOP karena auto-start
 FarmBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 FarmBtn.TextSize = 13
 FarmBtn.Font = Enum.Font.GothamBold
@@ -973,6 +974,9 @@ FarmBtnStroke.Thickness = 1.2
 FarmBtnStroke.Color = Color3.fromRGB(250, 204, 21)
 FarmBtnStroke.Transparency = 0.4
 FarmBtnStroke.Parent = FarmBtn
+
+-- Default state: farming = true (auto-start)
+State.farming = true
 
 -- Button click handler akan di-override oleh kaitun script
 FarmBtn.MouseButton1Click:Connect(function()
