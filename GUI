@@ -1,1 +1,1122 @@
 
+-- ============================================================
+-- JinHub NEW GUI
+-- ============================================================
+
+local CoreGui = game:GetService("CoreGui")
+local hui = (gethui and gethui()) or CoreGui
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local Lighting = game:GetService("Lighting")
+local UserGameSettings = UserSettings() and UserSettings():GetService("UserGameSettings")
+
+local OriginalRenderState = {
+    captured = false,
+    qualityLevel = nil,
+    globalShadows = nil,
+    terrainDecoration = nil,
+}
+
+local function captureOriginalRenderState()
+    if OriginalRenderState.captured then return end
+    pcall(function()
+        if UserGameSettings then
+            OriginalRenderState.qualityLevel = UserGameSettings.SavedQualityLevel
+        end
+    end)
+    pcall(function()
+        OriginalRenderState.globalShadows = Lighting.GlobalShadows
+    end)
+    pcall(function()
+        OriginalRenderState.terrainDecoration = workspace.Terrain.Decoration
+    end)
+    OriginalRenderState.captured = true
+end
+
+local function setLowRenderMode(enabled)
+    captureOriginalRenderState()
+
+    if enabled then
+        pcall(function()
+            if UserGameSettings then
+                UserGameSettings.SavedQualityLevel = Enum.SavedQualitySetting.QualityLevel1
+            end
+        end)
+        pcall(function()
+            Lighting.GlobalShadows = false
+        end)
+        pcall(function()
+            workspace.Terrain.Decoration = false
+        end)
+    else
+        pcall(function()
+            if UserGameSettings and OriginalRenderState.qualityLevel then
+                UserGameSettings.SavedQualityLevel = OriginalRenderState.qualityLevel
+            end
+        end)
+        pcall(function()
+            if OriginalRenderState.globalShadows ~= nil then
+                Lighting.GlobalShadows = OriginalRenderState.globalShadows
+            end
+        end)
+        pcall(function()
+            if OriginalRenderState.terrainDecoration ~= nil then
+                workspace.Terrain.Decoration = OriginalRenderState.terrainDecoration
+            end
+        end)
+    end
+end
+
+-- =============================================================
+-- MATURE CROP DETECTION — sama pola kayak cash detection:
+--   require module Framework asli, pcall-in semua, fallback ke 0
+--   kalau modulenya gak ada / API beda.
+-- =============================================================
+local ClientRestaurant = nil
+pcall(function()
+    ClientRestaurant = require(game:GetService("ReplicatedStorage"):WaitForChild("Framework", 5)
+        :WaitForChild("Client", 3)
+        :WaitForChild("ClientRestaurant", 3))
+end)
+
+local ClientCrop = nil
+pcall(function()
+    ClientCrop = require(game:GetService("ReplicatedStorage"):WaitForChild("Framework", 5)
+        :WaitForChild("Client", 3)
+        :WaitForChild("ClientEntity", 3)
+        :WaitForChild("ClientCrop", 3))
+end)
+
+-- =============================================================
+-- FRIDGE STORAGE DETECTION — sama pola: require module Framework
+-- asli, pcall-in, fallback ke nilai kosong kalau API-nya beda.
+-- =============================================================
+local ClientFridge = nil
+pcall(function()
+    ClientFridge = require(game:GetService("ReplicatedStorage"):WaitForChild("Framework", 5)
+        :WaitForChild("Client", 3)
+        :WaitForChild("ClientEntity", 3)
+        :WaitForChild("ClientFridge", 3))
+end)
+
+local CurrencyCmds = nil
+pcall(function()
+    CurrencyCmds = require(game:GetService("ReplicatedStorage"):WaitForChild("Framework", 5)
+        :WaitForChild("Client", 3)
+        :WaitForChild("CurrencyCmds", 3))
+end)
+
+-- =============================================================
+-- TARGET (INVENTORY ITEM COUNT) DETECTION — Wheat Plant & Rusty Fridge
+-- Sama pola: require module Framework asli, pcall-in, fallback 0.
+-- =============================================================
+local ItemDirectory = nil
+pcall(function()
+    ItemDirectory = require(game:GetService("ReplicatedStorage"):WaitForChild("Framework", 5)
+        :WaitForChild("Directory", 3)
+        :WaitForChild("Item", 3))
+end)
+
+local InventoryCmds = nil
+pcall(function()
+    InventoryCmds = require(game:GetService("ReplicatedStorage"):WaitForChild("Framework", 5)
+        :WaitForChild("Client", 3)
+        :WaitForChild("InventoryCmds", 3))
+end)
+
+local SavingModule = nil
+pcall(function()
+    SavingModule = require(game:GetService("ReplicatedStorage"):WaitForChild("Framework", 5)
+        :WaitForChild("Client", 3)
+        :WaitForChild("Saving", 3))
+end)
+
+local function getItemCount(itemKey)
+    if not (ItemDirectory and InventoryCmds) then return 0 end
+
+    local ok, entry = pcall(function()
+        return ItemDirectory[itemKey]
+    end)
+    if not (ok and entry) then return 0 end
+
+    local ok2, count = pcall(function()
+        return InventoryCmds.Count(entry)
+    end)
+    if ok2 and type(count) == "number" then
+        return count
+    end
+    return 0
+end
+
+local function getFridgeStorageState()
+    if not ClientFridge then return nil end
+    local ok, state = pcall(function()
+        return ClientFridge.ComputeStorageState()
+    end)
+    if not (ok and state) then return nil end
+    return state
+end
+
+local function getMatureCropCount()
+    if not (ClientRestaurant and ClientCrop) then return 0 end
+
+    local ok, restaurant = pcall(function()
+        return ClientRestaurant.GetLocal()
+    end)
+    if not (ok and restaurant) then return 0 end
+
+    local ok2, crops = pcall(function()
+        return restaurant:CollectSubclass("Crop")
+    end)
+    if not (ok2 and crops) then return 0 end
+
+    local count = 0
+    for _, crop in ipairs(crops) do
+        local ok3, isReady = pcall(function()
+            return ClientCrop.IsReady(crop)
+        end)
+        if ok3 and isReady then
+            count = count + 1
+        end
+    end
+    return count
+end
+
+-- Bersihin GUI lama biar gak numpuk
+for _, container in ipairs({CoreGui, hui, LocalPlayer and LocalPlayer:FindFirstChild("PlayerGui")}) do
+    if container then
+        local children = container:GetChildren()
+        for i = #children, 1, -1 do
+            local child = children[i]
+            if child.Name:find("Wind") or child.Name:find("Kaitun") or child.Name:find("MatrixHUD") then
+                pcall(function() child:Destroy() end)
+            end
+        end
+    end
+end
+
+-- =============================================================
+-- CASH DETECTION — ikutin pola shop code:
+--   1. Coba require Framework module dulu (sama kayak Shop.lua)
+--   2. Fallback ke leaderstats (ValueObject biasa)
+--   3. Fallback ke GetAttributes() player
+-- =============================================================
+
+-- Coba ambil Economy/Currency module dari Framework (kalau ada)
+-- Pola: require(game.ReplicatedStorage.Framework.Universal.<Module>)
+local EconomyModule = nil
+pcall(function()
+    EconomyModule = require(game:GetService("ReplicatedStorage"):WaitForChild("Framework", 5)
+        :WaitForChild("Universal", 3)
+        :WaitForChild("Economy", 3))
+end)
+
+local CurrencyModule = nil
+if not EconomyModule then
+    pcall(function()
+        CurrencyModule = require(game:GetService("ReplicatedStorage"):WaitForChild("Framework", 5)
+            :WaitForChild("Universal", 3)
+            :WaitForChild("Currency", 3))
+    end)
+end
+
+local function getCurrentCash()
+    if not LocalPlayer then return 0 end
+
+    -- [1] Prioritas: Framework module (sama kayak Shop.MeetsItemRequirements)
+    if EconomyModule then
+        local ok, val = pcall(function()
+            -- coba fungsi umum yang biasa ada di module economy
+            return EconomyModule.GetCash and EconomyModule.GetCash(LocalPlayer)
+                or EconomyModule.GetBalance and EconomyModule.GetBalance(LocalPlayer)
+                or EconomyModule.GetCurrency and EconomyModule.GetCurrency(LocalPlayer)
+        end)
+        if ok and type(val) == "number" and val > 0 then
+            return val
+        end
+    end
+
+    if CurrencyModule then
+        local ok, val = pcall(function()
+            return CurrencyModule.Get and CurrencyModule.Get(LocalPlayer)
+                or CurrencyModule.GetCash and CurrencyModule.GetCash(LocalPlayer)
+        end)
+        if ok and type(val) == "number" and val > 0 then
+            return val
+        end
+    end
+
+    -- [2] Fallback: leaderstats (ValueObject)
+    local maxCash = 0
+    local ls = LocalPlayer:FindFirstChild("leaderstats")
+    if ls then
+        for _, name in ipairs({ "Cash", "Money", "Coins", "Balance", "Dollars", "Credits" }) do
+            local c = ls:FindFirstChild(name)
+            if c and c:IsA("ValueBase") then
+                local str = tostring(c.Value):gsub(",", ""):gsub("%$", "")
+                maxCash = math.max(maxCash, tonumber(str) or 0)
+            end
+        end
+    end
+    if maxCash > 0 then return maxCash end
+
+    -- [3] Fallback: player Attributes (pola yang sama kayak shop check requirements)
+    for k, v in pairs(LocalPlayer:GetAttributes()) do
+        local kLow = k:lower()
+        if kLow:find("cash") or kLow:find("money") or kLow:find("currency") or kLow:find("coins") or kLow:find("balance") then
+            local str = tostring(v):gsub(",", ""):gsub("%$", "")
+            maxCash = math.max(maxCash, tonumber(str) or 0)
+        end
+    end
+
+    return maxCash
+end
+
+-- Dummy state cuma buat animasi visual & label, gak nyambung ke game
+local State = {
+    farming = false,
+    disable3D = false,
+    progress = 0,
+    showWinBanner = false,
+    winBannerEndTime = 0,
+}
+
+local function formatNumber(n)
+    local formatted = tostring(math.floor(n))
+    local k
+    while true do
+        formatted, k = string.gsub(formatted, "^(-?%d+)(%d%d%d)", '%1,%2')
+        if k == 0 then break end
+    end
+    return formatted
+end
+
+-- =============================================================
+-- SCRIPT EXECUTE TIME
+-- Dicatat begitu script ini jalan (os.clock() gak kepengaruh
+-- perubahan jam sistem, cocok buat itung elapsed duration).
+-- =============================================================
+local ScriptStartTime = os.clock()
+
+local function formatElapsed()
+    local elapsed = math.floor(os.clock() - ScriptStartTime)
+    if elapsed < 0 then elapsed = 0 end
+    local hh = math.floor(elapsed / 3600)
+    local mm = math.floor((elapsed % 3600) / 60)
+    local ss = elapsed % 60
+    return string.format("%02d:%02d:%02d", hh, mm, ss)
+end
+
+-- ============================================================
+-- ROOT
+-- ============================================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "JinHub_Kaitun"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+pcall(function() ScreenGui.Parent = hui end)
+if not ScreenGui.Parent then ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.fromOffset(740, 566)
+MainFrame.Position = UDim2.new(0.5, -370, 0.5, -283)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 23, 42)
+MainFrame.BorderSizePixel = 0
+MainFrame.ZIndex = 10
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.ClipsDescendants = false
+MainFrame.Parent = ScreenGui
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 18)
+MainCorner.Parent = MainFrame
+
+-- Background mesh + gradient
+local MeshBackground = Instance.new("Frame")
+MeshBackground.Name = "MeshBackground"
+MeshBackground.Size = UDim2.fromScale(1, 1)
+MeshBackground.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+MeshBackground.BorderSizePixel = 0
+MeshBackground.ZIndex = 10
+MeshBackground.ClipsDescendants = true
+MeshBackground.Parent = MainFrame
+
+local MeshCorner = Instance.new("UICorner")
+MeshCorner.CornerRadius = UDim.new(0, 18)
+MeshCorner.Parent = MeshBackground
+
+local MeshGradient = Instance.new("UIGradient")
+MeshGradient.Rotation = 35
+MeshGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(15, 23, 42)),
+    ColorSequenceKeypoint.new(0.35, Color3.fromRGB(30, 41, 59)),
+    ColorSequenceKeypoint.new(0.70, Color3.fromRGB(161, 98, 7)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(234, 179, 8))
+})
+MeshGradient.Parent = MeshBackground
+
+local LogoWatermark = Instance.new("ImageLabel")
+LogoWatermark.Name = "LogoWatermark"
+LogoWatermark.Size = UDim2.new(0, 420, 0, 420)
+LogoWatermark.Position = UDim2.new(0.5, -210, 0.5, -210)
+LogoWatermark.BackgroundTransparency = 1
+LogoWatermark.Image = "rbxassetid://75269568091825"
+LogoWatermark.ImageTransparency = 0.30
+LogoWatermark.ScaleType = Enum.ScaleType.Fit
+LogoWatermark.ZIndex = 11
+LogoWatermark.Parent = MeshBackground
+
+local SilkGlow = Instance.new("Frame")
+SilkGlow.Name = "SilkGlow"
+SilkGlow.Size = UDim2.new(0.85, 0, 0.9, 0)
+SilkGlow.Position = UDim2.new(0.25, 0, -0.1, 0)
+SilkGlow.BackgroundColor3 = Color3.fromRGB(250, 204, 21)
+SilkGlow.BackgroundTransparency = 0.87
+SilkGlow.BorderSizePixel = 0
+SilkGlow.ZIndex = 11
+SilkGlow.Parent = MeshBackground
+
+local SilkGlowCorner = Instance.new("UICorner")
+SilkGlowCorner.CornerRadius = UDim.new(1, 0)
+SilkGlowCorner.Parent = SilkGlow
+
+local GlassTint = Instance.new("Frame")
+GlassTint.Name = "GlassTint"
+GlassTint.Size = UDim2.fromScale(1, 1)
+GlassTint.BackgroundColor3 = Color3.fromRGB(8, 9, 14)
+GlassTint.BackgroundTransparency = 0.42
+GlassTint.BorderSizePixel = 0
+GlassTint.ZIndex = 11
+GlassTint.Parent = MeshBackground
+
+local GlassTintCorner = Instance.new("UICorner")
+GlassTintCorner.CornerRadius = UDim.new(0, 18)
+GlassTintCorner.Parent = GlassTint
+
+local MainStroke = Instance.new("UIStroke")
+MainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+MainStroke.Thickness = 1.4
+MainStroke.Color = Color3.fromRGB(250, 204, 21)
+MainStroke.Transparency = 0.70
+MainStroke.Parent = MainFrame
+
+task.spawn(function()
+    local rot = 35
+    while true do
+        rot = (rot + 0.15) % 360
+        MeshGradient.Rotation = rot
+        task.wait(0.04)
+    end
+end)
+
+-- ============================================================
+-- HEADER
+-- ============================================================
+local HeaderLabel = Instance.new("TextLabel")
+HeaderLabel.Size = UDim2.new(1, -56, 0, 34)
+HeaderLabel.Position = UDim2.new(0, 28, 0, 20)
+HeaderLabel.BackgroundTransparency = 1
+HeaderLabel.Text = "JinHub - Kaitun"
+HeaderLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+HeaderLabel.TextSize = 21
+HeaderLabel.Font = Enum.Font.GothamBold
+HeaderLabel.TextXAlignment = Enum.TextXAlignment.Left
+HeaderLabel.ZIndex = 12
+HeaderLabel.Parent = MainFrame
+
+local SubheaderLabel = Instance.new("TextLabel")
+SubheaderLabel.Size = UDim2.new(1, -56, 0, 20)
+SubheaderLabel.Position = UDim2.new(0, 28, 0, 52)
+SubheaderLabel.BackgroundTransparency = 1
+SubheaderLabel.Text = "Kaitun 0.0.1  |  discord.gg/XPdhVZTaNv  |  Status: IDLE"
+SubheaderLabel.TextColor3 = Color3.fromRGB(254, 240, 138)
+SubheaderLabel.TextSize = 13
+SubheaderLabel.Font = Enum.Font.GothamMedium
+SubheaderLabel.TextXAlignment = Enum.TextXAlignment.Left
+SubheaderLabel.ZIndex = 12
+SubheaderLabel.Parent = MainFrame
+
+-- ============================================================
+-- DOT MATRIX (animasi visual doang, gak nyambung progress asli)
+-- ============================================================
+local DotMatrixFrame = Instance.new("Frame")
+DotMatrixFrame.Name = "DotMatrixFrame"
+DotMatrixFrame.Size = UDim2.new(1, -56, 0, 140)
+DotMatrixFrame.Position = UDim2.new(0, 28, 0, 80)
+DotMatrixFrame.BackgroundTransparency = 1
+DotMatrixFrame.ZIndex = 12
+DotMatrixFrame.Parent = MainFrame
+
+local dots = {}
+local ROWS = 15
+local COLS = 34
+local DOT_SIZE = 8
+local WIN_DOTS_RAW = {
+    139, 140, 141, 143, 144, 145, 147, 151, 153, 157, 159, 163, 165, 166, 167, 168,
+    174, 178, 181, 182, 185, 187, 191, 193, 197, 199, 203, 208, 212, 215, 216, 219,
+    221, 225, 227, 231, 233, 237, 242, 246, 249, 251, 253, 255, 256, 257, 258, 259,
+    261, 265, 267, 268, 269, 270, 276, 280, 283, 286, 287, 289, 293, 295, 299, 301,
+    305, 307, 310, 314, 317, 320, 321, 323, 327, 329, 333, 335, 339, 342, 343, 347,
+    348, 349, 351, 355, 357, 361, 364, 365, 366, 369, 370, 371, 372
+}
+local WIN_LOOKUP = {}
+for _, idx in ipairs(WIN_DOTS_RAW) do WIN_LOOKUP[idx] = true end
+
+for r = 1, ROWS do
+    for c = 1, COLS do
+        local dot = Instance.new("Frame")
+        dot.Name = string.format("Dot_%d_%d", r, c)
+        dot.Size = UDim2.fromOffset(DOT_SIZE, DOT_SIZE)
+
+        local cellW = 684 / COLS
+        local cellH = 140 / ROWS
+        local posX = (c - 1) * cellW + ((cellW - DOT_SIZE) / 2)
+        local posY = (r - 1) * cellH + ((cellH - DOT_SIZE) / 2)
+
+        dot.Position = UDim2.fromOffset(posX, posY)
+        dot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        dot.BackgroundTransparency = 0.8
+        dot.ZIndex = 13
+        dot.Parent = DotMatrixFrame
+
+        local dCorner = Instance.new("UICorner")
+        dCorner.CornerRadius = UDim.new(1, 0)
+        dCorner.Parent = dot
+
+        local dStroke = Instance.new("UIStroke")
+        dStroke.Thickness = 1
+        dStroke.Color = Color3.fromRGB(74, 222, 128)
+        dStroke.Transparency = 1
+        dStroke.Parent = dot
+
+        local idx = (r - 1) * COLS + c
+        table.insert(dots, {
+            frame = dot,
+            stroke = dStroke,
+            row = r,
+            col = c,
+            index = idx,
+            isWinDot = WIN_LOOKUP[idx] == true,
+            currentCol = Color3.fromRGB(255, 255, 255),
+            currentTrans = 0.8
+        })
+    end
+end
+
+task.spawn(function()
+    while true do
+        local t = os.clock()
+        local isWinActive = State.showWinBanner and (t < State.winBannerEndTime)
+        if State.showWinBanner and (t >= State.winBannerEndTime) then
+            State.showWinBanner = false
+        end
+
+        local pct = math.clamp(State.progress, 0, 1)
+        local filledCount = math.floor(pct * #dots)
+
+        for _, item in ipairs(dots) do
+            local dot = item.frame
+            local stroke = item.stroke
+            local idx = item.index
+            local r = item.row
+            local c = item.col
+
+            local targetCol = Color3.fromRGB(255, 255, 255)
+            local targetTrans = 0.85
+            local strokeTrans = 1
+
+            if isWinActive then
+                if item.isWinDot then
+                    targetCol = Color3.fromRGB(74, 222, 128)
+                    targetTrans = 0.05
+                    strokeTrans = 0.15
+                    stroke.Color = Color3.fromRGB(34, 197, 94)
+                else
+                    local bgWave = math.sin(t * 3.5 + c * 0.35 + r * 0.25) * 0.5 + 0.5
+                    targetCol = Color3.fromRGB(240, 240, 245)
+                    targetTrans = math.clamp(0.88 - bgWave * 0.4, 0.5, 0.95)
+                    strokeTrans = 1
+                end
+            else
+                -- Dot fill sekarang ngikutin State.progress asli (fill % fridge),
+                -- gak lagi digantung ke State.farming (yang cuma toggle UI dummy).
+                if idx <= filledCount then
+                    targetCol = Color3.fromRGB(250, 204, 21)
+                    targetTrans = 0.1
+                    strokeTrans = 0.3
+                    stroke.Color = Color3.fromRGB(250, 204, 21)
+                else
+                    local speed = State.farming and 4.5 or 3.0
+                    local wave = math.sin(t * speed + c * 0.3 + r * 0.2) * 0.5 + 0.5
+                    targetCol = Color3.fromRGB(255, 255, 255)
+                    targetTrans = math.clamp(1 - wave * 0.6, 0.45, 0.92)
+                    strokeTrans = 1
+                end
+            end
+
+            item.currentCol = item.currentCol:Lerp(targetCol, 0.25)
+            item.currentTrans = item.currentTrans + (targetTrans - item.currentTrans) * 0.25
+
+            dot.BackgroundColor3 = item.currentCol
+            dot.BackgroundTransparency = item.currentTrans
+            stroke.Transparency = strokeTrans
+        end
+        task.wait(0.03)
+    end
+end)
+
+-- ============================================================
+-- METRIC LABELS (cash statis dari deteksi, timer live dari execute time)
+-- ============================================================
+local MetricPrimaryLabel = Instance.new("TextLabel")
+MetricPrimaryLabel.Name = "MetricPrimaryLabel"
+MetricPrimaryLabel.Size = UDim2.new(1, -56, 0, 36)
+MetricPrimaryLabel.Position = UDim2.new(0, 28, 0, 230)
+MetricPrimaryLabel.BackgroundTransparency = 1
+MetricPrimaryLabel.RichText = true
+MetricPrimaryLabel.TextSize = 19
+MetricPrimaryLabel.Font = Enum.Font.GothamBold
+MetricPrimaryLabel.TextXAlignment = Enum.TextXAlignment.Left
+MetricPrimaryLabel.ZIndex = 12
+MetricPrimaryLabel.Parent = MainFrame
+
+-- Satu fungsi terpusat buat update label cash + timer, biar konsisten
+-- dipanggil dari mana aja (poll loop, leaderstats.Changed, timer loop).
+local function updateMetricPrimaryLabel()
+    local cash = getCurrentCash()
+    MetricPrimaryLabel.Text = string.format(
+        '<font color="#FFFFFF"><b>$%s</b></font> <font color="#FEF08A">CASH</font>   <font color="#FACC15">@</font>   <font color="#FFFFFF"><b>%s</b></font>',
+        formatNumber(cash),
+        formatElapsed()
+    )
+end
+
+updateMetricPrimaryLabel()
+
+local MetricSecondaryLabel = Instance.new("TextLabel")
+MetricSecondaryLabel.Name = "MetricSecondaryLabel"
+MetricSecondaryLabel.Size = UDim2.new(1, -56, 0, 22)
+MetricSecondaryLabel.Position = UDim2.new(0, 28, 0, 270)
+MetricSecondaryLabel.BackgroundTransparency = 1
+MetricSecondaryLabel.RichText = true
+MetricSecondaryLabel.TextSize = 13
+MetricSecondaryLabel.Font = Enum.Font.GothamMedium
+MetricSecondaryLabel.TextXAlignment = Enum.TextXAlignment.Left
+MetricSecondaryLabel.ZIndex = 12
+MetricSecondaryLabel.Parent = MainFrame
+
+-- =============================================================
+-- LIVE FPS TRACKING
+-- Ngitung FPS asli dari delta waktu antar Heartbeat, di-smooth
+-- pake rolling average biar angkanya gak lompat-lompat tiap frame.
+-- =============================================================
+local RunService = game:GetService("RunService")
+local currentFPS = 60
+
+-- =============================================================
+-- LIVE PING TRACKING
+-- Ambil dari Stats.Network.ServerStatsItem["Data Ping"], sama
+-- kayak yang dipake Roblox buat nampilin ping di F3/dev console.
+-- =============================================================
+local Stats = game:GetService("Stats")
+local currentPing = 0
+
+local function updatePing()
+    local ok, pingItem = pcall(function()
+        return Stats.Network.ServerStatsItem["Data Ping"]
+    end)
+    if not (ok and pingItem) then return end
+
+    local ok2, val = pcall(function()
+        return pingItem:GetValue()
+    end)
+    if ok2 and type(val) == "number" then
+        currentPing = val
+    end
+end
+
+local currentMatureCrop = 0
+
+local function updateMetricSecondaryLabel()
+    MetricSecondaryLabel.Text = string.format(
+        '<font color="#FFFFFF"><b>%d</b></font> <font color="#FEF08A">Mature Crop</font>   <font color="#FACC15">|</font>   <font color="#FFFFFF"><b>%d</b></font> <font color="#FEF08A">FPS</font>   <font color="#FACC15">|</font>   <font color="#FFFFFF"><b>%d</b></font> <font color="#94A3B8">ms Ping</font>',
+        currentMatureCrop,
+        math.floor(currentFPS + 0.5),
+        math.floor(currentPing + 0.5)
+    )
+end
+updateMetricSecondaryLabel()
+
+-- Poll tiap 0.5s buat catch crop yang matang seiring waktu (Stage berubah
+-- tanpa event eksplisit), plus listen ke EntityAdded/Removed biar instan
+-- kalau ada crop baru ditanam / dipanen / restoran ganti.
+task.spawn(function()
+    while task.wait(0.5) do
+        pcall(function()
+            currentMatureCrop = getMatureCropCount()
+        end)
+    end
+end)
+
+task.spawn(function()
+    if not ClientRestaurant then return end
+    local restaurant = ClientRestaurant.WaitLocal and ClientRestaurant.WaitLocal() or ClientRestaurant.GetLocal()
+    if not restaurant then return end
+
+    local function refresh()
+        pcall(function()
+            currentMatureCrop = getMatureCropCount()
+            updateMetricSecondaryLabel()
+        end)
+    end
+
+    restaurant.EntityAdded:Connect(refresh)
+    restaurant.EntityRemoved:Connect(refresh)
+    restaurant.SessionChanged:Connect(refresh)
+end)
+
+-- ============================================================
+-- TARGET LABEL (baris baru di bawah Mature Crop / FPS / Ping)
+-- ============================================================
+local TargetLabel = Instance.new("TextLabel")
+TargetLabel.Name = "TargetLabel"
+TargetLabel.Size = UDim2.new(1, -56, 0, 18)
+TargetLabel.Position = UDim2.new(0, 28, 0, 294)
+TargetLabel.BackgroundTransparency = 1
+TargetLabel.RichText = true
+TargetLabel.TextSize = 13
+TargetLabel.Font = Enum.Font.GothamMedium
+TargetLabel.TextXAlignment = Enum.TextXAlignment.Left
+TargetLabel.ZIndex = 12
+TargetLabel.Parent = MainFrame
+
+-- State.target sekarang di-drive dari jumlah item asli di inventory player
+State.target = State.target or {}
+
+local function updateTargetLabel()
+    local wheatCount = State.target.wheatPlant or 0
+    local fridgeCount = State.target.rustyFridge or 0
+    TargetLabel.Text = string.format(
+        '<font color="#FEF08A">Target:</font>   <font color="#FFFFFF"><b>Wheat Plant</b></font> <font color="#FEF08A">x%d</font>   <font color="#FACC15">|</font>   <font color="#FFFFFF"><b>Rusty Fridge</b></font> <font color="#FEF08A">x%d</font>',
+        wheatCount,
+        fridgeCount
+    )
+end
+updateTargetLabel()
+
+local function refreshTargetState()
+    State.target = {
+        wheatPlant = getItemCount("Wheat Plant"),
+        rustyFridge = getItemCount("Rusty Fridge"),
+    }
+    updateTargetLabel()
+end
+refreshTargetState()
+
+-- Realtime: langsung refresh instan tiap kali inventory berubah (item
+-- didapet/dijual/dipake), plus poll 1s sebagai fallback.
+if SavingModule then
+    pcall(function()
+        SavingModule.GetChangedSignal("Inventory"):Connect(function()
+            pcall(refreshTargetState)
+        end)
+    end)
+end
+
+task.spawn(function()
+    while task.wait(1) do
+        pcall(refreshTargetState)
+    end
+end)
+
+-- ============================================================
+-- ACTIVE QUEST LABEL (baris baru di bawah Target)
+-- ============================================================
+local ActiveQuestLabel = Instance.new("TextLabel")
+ActiveQuestLabel.Name = "ActiveQuestLabel"
+ActiveQuestLabel.Size = UDim2.new(1, -56, 0, 18)
+ActiveQuestLabel.Position = UDim2.new(0, 28, 0, 316)
+ActiveQuestLabel.BackgroundTransparency = 1
+ActiveQuestLabel.RichText = true
+ActiveQuestLabel.TextSize = 13
+ActiveQuestLabel.Font = Enum.Font.GothamMedium
+ActiveQuestLabel.TextXAlignment = Enum.TextXAlignment.Left
+ActiveQuestLabel.ZIndex = 12
+ActiveQuestLabel.Parent = MainFrame
+
+-- State.activeQuest bisa diisi manual atau dihubungkan ke data quest asli nanti
+State.activeQuest = State.activeQuest or "-"
+
+local function updateActiveQuestLabel()
+    ActiveQuestLabel.Text = string.format(
+        '<font color="#FEF08A">Active Quest:</font>   <font color="#FFFFFF"><b>%s</b></font>',
+        tostring(State.activeQuest)
+    )
+end
+updateActiveQuestLabel()
+
+-- ============================================================
+-- CPM LABEL (baris baru di bawah Active Quest)
+-- ============================================================
+local CpmLabel = Instance.new("TextLabel")
+CpmLabel.Name = "CpmLabel"
+CpmLabel.Size = UDim2.new(1, -56, 0, 18)
+CpmLabel.Position = UDim2.new(0, 28, 0, 338)
+CpmLabel.BackgroundTransparency = 1
+CpmLabel.RichText = true
+CpmLabel.TextSize = 13
+CpmLabel.Font = Enum.Font.GothamMedium
+CpmLabel.TextXAlignment = Enum.TextXAlignment.Left
+CpmLabel.ZIndex = 12
+CpmLabel.Parent = MainFrame
+
+-- =============================================================
+-- CPM (CASH PER MINUTE) — REALTIME
+-- Ngambil data dari getCurrentCash() yang udah ada, di-sample tiap
+-- 1 detik ke rolling window 60 detik. CPM dihitung dari total
+-- KENAIKAN cash di window itu (bukan selisih akhir-awal polos),
+-- biar CPM gak jatoh ke negatif kalau cash turun karena belanja/spend
+-- — itu bukan bagian dari "pendapatan per menit".
+-- =============================================================
+local CPM_WINDOW_SECONDS = 60
+local cashHistory = {} -- array of {t = os.clock(), cash = number}
+
+local function pushCashSample(cash)
+    local t = os.clock()
+    table.insert(cashHistory, {t = t, cash = cash})
+    -- buang sample yang udah keluar window
+    while #cashHistory > 0 and (t - cashHistory[1].t) > CPM_WINDOW_SECONDS do
+        table.remove(cashHistory, 1)
+    end
+end
+
+local function computeCpm()
+    if #cashHistory < 2 then return 0 end
+
+    local earned = 0
+    for i = 2, #cashHistory do
+        local delta = cashHistory[i].cash - cashHistory[i - 1].cash
+        if delta > 0 then
+            earned = earned + delta
+        end
+    end
+
+    local elapsedSeconds = cashHistory[#cashHistory].t - cashHistory[1].t
+    if elapsedSeconds <= 0 then return 0 end
+
+    local elapsedMinutes = elapsedSeconds / 60
+    return earned / elapsedMinutes
+end
+
+State.cpm = State.cpm or "-"
+
+local function updateCpmLabel()
+    local displayVal
+    if type(State.cpm) == "number" then
+        displayVal = "$" .. formatNumber(State.cpm) .. "/min"
+    else
+        displayVal = tostring(State.cpm)
+    end
+    CpmLabel.Text = string.format(
+        '<font color="#FEF08A">Cpm:</font>   <font color="#FFFFFF"><b>%s</b></font>',
+        displayVal
+    )
+end
+updateCpmLabel()
+
+-- Sample cash tiap 1 detik buat isi rolling window, terus hitung ulang CPM
+task.spawn(function()
+    while task.wait(1) do
+        pcall(function()
+            pushCashSample(getCurrentCash())
+            State.cpm = computeCpm()
+            updateCpmLabel()
+        end)
+    end
+end)
+
+-- ============================================================
+-- FRIDGE LABEL (baris baru di bawah Cpm)
+-- ============================================================
+local FridgeLabel = Instance.new("TextLabel")
+FridgeLabel.Name = "FridgeLabel"
+FridgeLabel.Size = UDim2.new(1, -56, 0, 18)
+FridgeLabel.Position = UDim2.new(0, 28, 0, 360)
+FridgeLabel.BackgroundTransparency = 1
+FridgeLabel.RichText = true
+FridgeLabel.TextSize = 13
+FridgeLabel.Font = Enum.Font.GothamMedium
+FridgeLabel.TextXAlignment = Enum.TextXAlignment.Left
+FridgeLabel.ZIndex = 12
+FridgeLabel.Parent = MainFrame
+
+-- State.fridge di-drive dari ClientFridge.ComputeStorageState() (Usage/Capacity)
+State.fridge = State.fridge or "-"
+
+local function updateFridgeLabel()
+    local displayVal
+    local state = type(State.fridge) == "table" and State.fridge or nil
+    if state then
+        displayVal = string.format("%d/%d", state.Usage, state.Capacity)
+    else
+        displayVal = tostring(State.fridge)
+    end
+    FridgeLabel.Text = string.format(
+        '<font color="#FEF08A">Fridge:</font>   <font color="#FFFFFF"><b>%s</b></font>',
+        displayVal
+    )
+end
+updateFridgeLabel()
+
+local function refreshFridgeState()
+    local state = getFridgeStorageState()
+    if state then
+        State.fridge = state
+        -- Dot matrix progress sekarang narik data real: rasio isi fridge
+        -- (Usage/Capacity), bukan dummy lagi.
+        State.progress = math.clamp(state.PercentUsage or 0, 0, 1)
+    else
+        State.fridge = "-"
+        State.progress = 0
+    end
+    updateFridgeLabel()
+end
+refreshFridgeState()
+
+-- Realtime: setiap ada perubahan currency (nambah/jual bahan) fridge langsung
+-- diitung ulang instan lewat CurrencyCmds.Changed, plus poll 1s buat fallback
+-- (misal capacity berubah karena upgrade, atau pindah restoran).
+if CurrencyCmds then
+    pcall(function()
+        CurrencyCmds.Changed:Connect(function()
+            pcall(refreshFridgeState)
+        end)
+    end)
+end
+
+task.spawn(function()
+    while task.wait(1) do
+        pcall(refreshFridgeState)
+    end
+end)
+
+RunService.Heartbeat:Connect(function(deltaTime)
+    if deltaTime > 0 then
+        local instantFPS = 1 / deltaTime
+        -- smoothing ringan (exponential moving average)
+        currentFPS = currentFPS + (instantFPS - currentFPS) * 0.1
+    end
+end)
+
+-- ============================================================
+-- CONTROLS (Min Bounty slider & Server Hop Mode dropdown DIHAPUS)
+-- ============================================================
+local ControlsFrame = Instance.new("Frame")
+ControlsFrame.Name = "ControlsFrame"
+ControlsFrame.Size = UDim2.new(1, -56, 0, 106)
+ControlsFrame.Position = UDim2.new(0, 28, 0, 388)
+ControlsFrame.BackgroundTransparency = 1
+ControlsFrame.ZIndex = 12
+ControlsFrame.Parent = MainFrame
+
+local function createSubButton(parent, size, pos, textStr)
+    local btn = Instance.new("TextButton")
+    btn.Size = size
+    btn.Position = pos
+    btn.BackgroundColor3 = Color3.fromRGB(15, 23, 42)
+    btn.BackgroundTransparency = 0.3
+    btn.Text = textStr
+    btn.TextColor3 = Color3.fromRGB(240, 240, 245)
+    btn.TextSize = 12
+    btn.Font = Enum.Font.GothamBold
+    btn.ZIndex = 13
+    btn.Parent = parent
+
+    local bCorner = Instance.new("UICorner")
+    bCorner.CornerRadius = UDim.new(0, 12)
+    bCorner.Parent = btn
+
+    local bStroke = Instance.new("UIStroke")
+    bStroke.Thickness = 1
+    bStroke.Color = Color3.fromRGB(250, 204, 21)
+    bStroke.Transparency = 0.75
+    bStroke.Parent = btn
+
+    return btn, bStroke
+end
+
+-- Tombol Farm (cuma toggle teks/warna, gak jalanin apa-apa)
+local FarmBtn = Instance.new("TextButton")
+FarmBtn.Name = "FarmBtn"
+FarmBtn.Size = UDim2.new(0, 330, 0, 44)
+FarmBtn.Position = UDim2.new(0, 0, 0, 0)
+FarmBtn.BackgroundColor3 = Color3.fromRGB(234, 179, 8)
+FarmBtn.Text = "START AUTO FARM"
+FarmBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+FarmBtn.TextSize = 13
+FarmBtn.Font = Enum.Font.GothamBold
+FarmBtn.ZIndex = 13
+FarmBtn.Parent = ControlsFrame
+
+local FarmBtnCorner = Instance.new("UICorner")
+FarmBtnCorner.CornerRadius = UDim.new(0, 12)
+FarmBtnCorner.Parent = FarmBtn
+
+local FarmBtnStroke = Instance.new("UIStroke")
+FarmBtnStroke.Thickness = 1.2
+FarmBtnStroke.Color = Color3.fromRGB(250, 204, 21)
+FarmBtnStroke.Transparency = 0.4
+FarmBtnStroke.Parent = FarmBtn
+
+FarmBtn.MouseButton1Click:Connect(function()
+    State.farming = not State.farming
+    FarmBtn.Text = State.farming and "STOP AUTO FARM" or "START AUTO FARM"
+    FarmBtn.BackgroundColor3 = State.farming and Color3.fromRGB(225, 29, 72) or Color3.fromRGB(234, 179, 8)
+end)
+
+-- Tombol Disable 3D — beneran nurunin quality rendering (bukan cuma toggle teks)
+local Disable3DBtn, Disable3DStroke = createSubButton(
+    ControlsFrame, UDim2.new(0, 340, 0, 44), UDim2.new(0, 344, 0, 0),
+    "Disable 3D: OFF"
+)
+Disable3DBtn.MouseButton1Click:Connect(function()
+    State.disable3D = not State.disable3D
+    Disable3DBtn.Text = "Disable 3D: " .. (State.disable3D and "ON" or "OFF")
+    pcall(setLowRenderMode, State.disable3D)
+end)
+
+-- Webhook input (cuma nyimpen teks lokal, gak ada pengiriman apapun)
+local WebhookContainer = Instance.new("Frame")
+WebhookContainer.Size = UDim2.new(1, 0, 0, 50)
+WebhookContainer.Position = UDim2.new(0, 0, 0, 56)
+WebhookContainer.BackgroundColor3 = Color3.fromRGB(15, 23, 42)
+WebhookContainer.BackgroundTransparency = 0.4
+WebhookContainer.ZIndex = 13
+WebhookContainer.Parent = ControlsFrame
+
+local WebhookCorner = Instance.new("UICorner")
+WebhookCorner.CornerRadius = UDim.new(0, 12)
+WebhookCorner.Parent = WebhookContainer
+
+local WebhookStroke = Instance.new("UIStroke")
+WebhookStroke.Thickness = 1
+WebhookStroke.Color = Color3.fromRGB(250, 204, 21)
+WebhookStroke.Transparency = 0.75
+WebhookStroke.Parent = WebhookContainer
+
+local WebhookTitle = Instance.new("TextLabel")
+WebhookTitle.Size = UDim2.new(0, 130, 1, 0)
+WebhookTitle.Position = UDim2.new(0, 14, 0, 0)
+WebhookTitle.BackgroundTransparency = 1
+WebhookTitle.Text = "Discord Webhook:"
+WebhookTitle.TextColor3 = Color3.fromRGB(240, 240, 245)
+WebhookTitle.TextSize = 12
+WebhookTitle.Font = Enum.Font.GothamBold
+WebhookTitle.TextXAlignment = Enum.TextXAlignment.Left
+WebhookTitle.ZIndex = 14
+WebhookTitle.Parent = WebhookContainer
+
+local WebhookInputBox = Instance.new("TextBox")
+WebhookInputBox.Size = UDim2.new(0, 375, 0, 34)
+WebhookInputBox.Position = UDim2.new(0, 145, 0.5, -17)
+WebhookInputBox.BackgroundColor3 = Color3.fromRGB(30, 41, 59)
+WebhookInputBox.Text = ""
+WebhookInputBox.PlaceholderText = "Paste Webhook URL..."
+WebhookInputBox.TextColor3 = Color3.fromRGB(250, 204, 21)
+WebhookInputBox.TextSize = 11
+WebhookInputBox.Font = Enum.Font.GothamMedium
+WebhookInputBox.ClearTextOnFocus = false
+WebhookInputBox.ClipsDescendants = true
+WebhookInputBox.ZIndex = 14
+WebhookInputBox.Parent = WebhookContainer
+
+local WebhookInputCorner = Instance.new("UICorner")
+WebhookInputCorner.CornerRadius = UDim.new(0, 8)
+WebhookInputCorner.Parent = WebhookInputBox
+
+local WebhookInputStroke = Instance.new("UIStroke")
+WebhookInputStroke.Thickness = 1
+WebhookInputStroke.Color = Color3.fromRGB(250, 204, 21)
+WebhookInputStroke.Transparency = 0.5
+WebhookInputStroke.Parent = WebhookInputBox
+
+local TestWebhookBtn = Instance.new("TextButton")
+TestWebhookBtn.Size = UDim2.new(0, 140, 0, 34)
+TestWebhookBtn.Position = UDim2.new(1, -150, 0.5, -17)
+TestWebhookBtn.BackgroundColor3 = Color3.fromRGB(234, 179, 8)
+TestWebhookBtn.Text = "TEST WEBHOOK"
+TestWebhookBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+TestWebhookBtn.TextSize = 11
+TestWebhookBtn.Font = Enum.Font.GothamBold
+TestWebhookBtn.ZIndex = 14
+TestWebhookBtn.Parent = WebhookContainer
+
+local TestWebhookCorner = Instance.new("UICorner")
+TestWebhookCorner.CornerRadius = UDim.new(0, 8)
+TestWebhookCorner.Parent = TestWebhookBtn
+
+-- Tombol test cuma ganti teks doang, TIDAK mengirim apapun keluar
+TestWebhookBtn.MouseButton1Click:Connect(function()
+    TestWebhookBtn.Text = "SENDING..."
+    task.wait(0.5)
+    TestWebhookBtn.Text = "SENT!"
+    task.wait(1.5)
+    TestWebhookBtn.Text = "TEST WEBHOOK"
+end)
+
+-- ============================================================
+-- FOOTER
+-- ============================================================
+local FooterLabel = Instance.new("TextLabel")
+FooterLabel.Size = UDim2.new(1, -56, 0, 18)
+FooterLabel.Position = UDim2.new(0, 28, 0, 531)
+FooterLabel.BackgroundTransparency = 1
+FooterLabel.Text = "JinHub v1.0.0 "
+FooterLabel.TextColor3 = Color3.fromRGB(148, 163, 184)
+FooterLabel.TextSize = 10
+FooterLabel.Font = Enum.Font.GothamMedium
+FooterLabel.TextXAlignment = Enum.TextXAlignment.Left
+FooterLabel.ZIndex = 12
+FooterLabel.Parent = MainFrame
+
+task.spawn(function()
+    while task.wait(0.5) do
+        pcall(updateMetricPrimaryLabel)
+    end
+end)
+
+-- Listen ke perubahan leaderstats kalau ValueObject (instant update, gak nunggu poll)
+-- Pola: connect .Changed ke label update, sama kayak shop listen ke stock change
+task.spawn(function()
+    local ls = LocalPlayer:WaitForChild("leaderstats", 10)
+    if not ls then return end
+
+    for _, name in ipairs({ "Cash", "Money", "Coins", "Balance", "Dollars", "Credits" }) do
+        local c = ls:FindFirstChild(name)
+        if c and c:IsA("ValueBase") then
+            c.Changed:Connect(function()
+                pcall(updateMetricPrimaryLabel)
+            end)
+        end
+    end
+end)
+
+task.spawn(function()
+    while task.wait(1) do
+        pcall(updateMetricPrimaryLabel)
+    end
+end)
+
+task.spawn(function()
+    while task.wait(0.5) do
+        pcall(updatePing)
+        pcall(updateMetricSecondaryLabel)
+    end
+end)
+
+-- Win banner preview (animasi dot matrix)
+State.showWinBanner = true
+State.winBannerEndTime = os.clock() + 4
