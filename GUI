@@ -1,5 +1,5 @@
 -- ============================================================
--- JinHub NEW GUI v1.8
+-- JinHub NEW GUI v1.9
 -- ============================================================
 
 local CoreGui = game:GetService("CoreGui")
@@ -703,6 +703,17 @@ State.target = State.target or {}
 local function updateTargetLabel()
     local wheatCount = State.target.wheatPlant or 0
     local fridgeCount = State.target.rustyFridge or 0
+    
+    -- v3.9: At Step 4, show Farming Milestone progress instead
+    if getgenv().KaitunCurrentStep and getgenv().KaitunCurrentStep >= 4 then
+        local cropsHarvested = getgenv().KaitunFarmingProgress or 0
+        TargetLabel.Text = string.format(
+            '<font color="#FEF08A">Target:</font>   <font color="#86EFAC">%s/400k Crops!</font>',
+            tostring(cropsHarvested)
+        )
+        return
+    end
+    
     TargetLabel.Text = string.format(
         '<font color="#FEF08A">Target:</font>   <font color="#FFFFFF"><b>Wheat Plant</b></font> <font color="#FEF08A">x%d</font>   <font color="#FACC15">|</font>   <font color="#FFFFFF"><b>Rusty Fridge</b></font> <font color="#FEF08A">x%d</font>',
         wheatCount,
