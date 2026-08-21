@@ -1,5 +1,5 @@
 -- ============================================================
--- JinHub NEW GUI v1.6
+-- JinHub NEW GUI v1.5
 -- ============================================================
 
 local CoreGui = game:GetService("CoreGui")
@@ -879,59 +879,6 @@ local function updateFridgeLabel()
 end
 updateFridgeLabel()
 
--- ============================================================
--- TASK LABEL (baris baru di bawah Fridge)
--- Real-time activity tracker: Idle, Serve, Cooking, Dishwasher, etc.
--- ============================================================
-local TaskLabel = Instance.new("TextLabel")
-TaskLabel.Name = "TaskLabel"
-TaskLabel.Size = UDim2.new(1, -56, 0, 18)
-TaskLabel.Position = UDim2.new(0, 28, 0, 382)
-TaskLabel.BackgroundTransparency = 1
-TaskLabel.RichText = true
-TaskLabel.TextSize = 13
-TaskLabel.Font = Enum.FontWeight.GothamMedium
-TaskLabel.TextXAlignment = Enum.TextXAlignment.Left
-TaskLabel.ZIndex = 12
-TaskLabel.Parent = MainFrame
-
-State.currentTask = State.currentTask or "Idle"
-
-local function updateTaskLabel()
-    -- Color coding untuk berbagai aktivitas
-    local taskColor = "#FFFFFF"
-    local task = tostring(State.currentTask)
-    
-    if task == "Serve" or task == "Serving" then
-        taskColor = "#86EFAC" -- green
-    elseif task == "Cooking" or task == "Cook" then
-        taskColor = "#FCA5A5" -- red
-    elseif task == "Dishwasher" or task == "Cleaning" then
-        taskColor = "#93C5FD" -- blue
-    elseif task == "Harvest" or task == "Harvesting" then
-        taskColor = "#FDE047" -- yellow
-    elseif task == "Claim Cash" or task == "Claiming" then
-        taskColor = "#FDE047" -- yellow
-    elseif task == "Take Order" or task == "Taking Order" then
-        taskColor = "#C4B5FD" -- purple
-    elseif task == "Sit Customer" or task == "Seating" then
-        taskColor = "#FDA4AF" -- pink
-    elseif task == "Buy Item" or task == "Shopping" then
-        taskColor = "#FDBA74" -- orange
-    elseif task == "Place Furniture" or task == "Placing" then
-        taskColor = "#A78BFA" -- violet
-    elseif task == "Idle" then
-        taskColor = "#9CA3AF" -- gray
-    end
-    
-    TaskLabel.Text = string.format(
-        '<font color="#FEF08A">Task:</font>   <font color="%s"><b>%s</b></font>',
-        taskColor,
-        task
-    )
-end
-updateTaskLabel()
-
 local function refreshFridgeState()
     local state = getFridgeStorageState()
     if state then
@@ -1198,7 +1145,6 @@ return {
     Disable3DBtn = Disable3DBtn,
     setLowRenderMode = setLowRenderMode,
     updateActiveQuestLabel = updateActiveQuestLabel,
-    updateTaskLabel = updateTaskLabel,
     updateTargetLabel = updateTargetLabel,
     updateMetricPrimaryLabel = updateMetricPrimaryLabel,
     updateMetricSecondaryLabel = updateMetricSecondaryLabel,
