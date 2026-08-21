@@ -1,5 +1,5 @@
 -- ============================================================
--- JinHub NEW GUI v1.7
+-- JinHub NEW GUI v1.8
 -- ============================================================
 
 local CoreGui = game:GetService("CoreGui")
@@ -926,7 +926,8 @@ TaskLabel.TextXAlignment = Enum.TextXAlignment.Left
 TaskLabel.ZIndex = 12
 TaskLabel.Parent = MainFrame
 
-State.task = "Idle"
+-- Initialize State.task only if not already set
+State.task = State.task or "Idle"
 
 local function updateTaskLabel()
     TaskLabel.Text = string.format(
