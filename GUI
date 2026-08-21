@@ -1,5 +1,5 @@
 -- ============================================================
--- JinHub NEW GUI v1.5
+-- JinHub NEW GUI v1.6
 -- ============================================================
 
 local CoreGui = game:GetService("CoreGui")
@@ -911,6 +911,31 @@ task.spawn(function()
     end
 end)
 
+-- ============================================================
+-- TASK LABEL (baris baru di bawah Fridge) - Realtime Activity
+-- ============================================================
+local TaskLabel = Instance.new("TextLabel")
+TaskLabel.Name = "TaskLabel"
+TaskLabel.Size = UDim2.new(1, -56, 0, 18)
+TaskLabel.Position = UDim2.new(0, 28, 0, 382)
+TaskLabel.BackgroundTransparency = 1
+TaskLabel.RichText = true
+TaskLabel.TextSize = 13
+TaskLabel.Font = Enum.Font.GothamMedium
+TaskLabel.TextXAlignment = Enum.TextXAlignment.Left
+TaskLabel.ZIndex = 12
+TaskLabel.Parent = MainFrame
+
+State.task = "Idle"
+
+local function updateTaskLabel()
+    TaskLabel.Text = string.format(
+        '<font color="#FEF08A">Task:</font>   <font color="#FFFFFF"><b>%s</b></font>',
+        tostring(State.task)
+    )
+end
+updateTaskLabel()
+
 RunService.Heartbeat:Connect(function(deltaTime)
     if deltaTime > 0 then
         local instantFPS = 1 / deltaTime
@@ -925,7 +950,7 @@ end)
 local ControlsFrame = Instance.new("Frame")
 ControlsFrame.Name = "ControlsFrame"
 ControlsFrame.Size = UDim2.new(1, -56, 0, 106)
-ControlsFrame.Position = UDim2.new(0, 28, 0, 388)
+ControlsFrame.Position = UDim2.new(0, 28, 0, 410)
 ControlsFrame.BackgroundTransparency = 1
 ControlsFrame.ZIndex = 12
 ControlsFrame.Parent = MainFrame
@@ -1148,4 +1173,5 @@ return {
     updateTargetLabel = updateTargetLabel,
     updateMetricPrimaryLabel = updateMetricPrimaryLabel,
     updateMetricSecondaryLabel = updateMetricSecondaryLabel,
+    updateTaskLabel = updateTaskLabel,
 }
